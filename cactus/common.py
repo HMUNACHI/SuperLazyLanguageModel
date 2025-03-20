@@ -7,3 +7,5 @@ GRADIENT_DIR = f"{CACHE_DIR}/gradient_checkpoints"
 os.makedirs(GRADIENT_DIR, exist_ok=True)
 
 MAX_CONCURRENT_THREADS = os.cpu_count() * 2
+
+CACTUS_TOKEN = os.getenv("CACTUS_TOKEN")
