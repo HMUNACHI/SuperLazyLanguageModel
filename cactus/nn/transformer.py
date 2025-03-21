@@ -19,6 +19,8 @@ from cactus.nn.layers import (
     CactusEmbedding,
 )
 
+from cactus.common import DTYPE
+
 
 class CactusDecoderLayer(nn.Module):
     def __init__(self, config: CactusConfig, layer_idx: int):

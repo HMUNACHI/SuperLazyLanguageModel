@@ -1,5 +1,6 @@
 from cactus.common import WEIGHT_DIR
-from cactus.utils import download_weights
+from cactus.utils import download_weights, remove_weights
+import os
 
 
 class CactusConfig:

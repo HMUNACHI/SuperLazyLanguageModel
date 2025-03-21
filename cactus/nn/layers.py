@@ -12,6 +12,7 @@ from cactus.nn.autodiff import (
     CactusMatmulFunction,
 )
 from cactus.utils import load_tensor_from_storage
+from cactus.common import DTYPE
 
 
 class CactusEmbedding(torch.nn.Module):
@@ -254,25 +255,25 @@ class CactusLoraQKVLinear(nn.Module):
         self.lora_dropout = nn.Dropout(config.lora_dropout)
 
         self.q_proj_lora_A = nn.Parameter(
-            torch.randn(config.hidden_size, config.lora_r)
+            torch.randn(config.hidden_size, config.lora_r, dtype=DTYPE)
         )
         nn.init.kaiming_uniform_(self.q_proj_lora_A, nonlinearity="linear")
         self.q_proj_lora_B = nn.Parameter(
-            torch.zeros(config.lora_r, config.num_attention_heads * head_dim)
+            torch.zeros(config.lora_r, config.num_attention_heads * head_dim, dtype=DTYPE)
         )
         self.k_proj_lora_A = nn.Parameter(
-            torch.randn(config.hidden_size, config.lora_r)
+            torch.randn(config.hidden_size, config.lora_r, dtype=DTYPE)
         )
         nn.init.kaiming_uniform_(self.k_proj_lora_A, nonlinearity="linear")
         self.k_proj_lora_B = nn.Parameter(
-            torch.zeros(config.lora_r, config.num_key_value_heads * head_dim)
+            torch.zeros(config.lora_r, config.num_key_value_heads * head_dim, dtype=DTYPE)
         )
         self.v_proj_lora_A = nn.Parameter(
-            torch.randn(config.hidden_size, config.lora_r)
+            torch.randn(config.hidden_size, config.lora_r, dtype=DTYPE)
         )
         nn.init.kaiming_uniform_(self.v_proj_lora_A, nonlinearity="linear")
         self.v_proj_lora_B = nn.Parameter(
-            torch.zeros(config.lora_r, config.num_key_value_heads * head_dim)
+            torch.zeros(config.lora_r, config.num_key_value_heads * head_dim, dtype=DTYPE)
         )
 
         self.q_weight_path = q_weight_path

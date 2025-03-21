@@ -75,6 +75,10 @@ venv.bak/
 .DS_Store
 Thumbs.db
 
+# Python cache files
+__pycache__/
+*.py[cod]
+
 # mypy
 .mypy_cache/
 .dmypy.json

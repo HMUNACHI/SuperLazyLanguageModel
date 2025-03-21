@@ -1,4 +1,5 @@
 import os
+import torch
 from platformdirs import user_cache_dir
 
 CACHE_DIR = user_cache_dir("cactus")
@@ -9,3 +10,6 @@ os.makedirs(GRADIENT_DIR, exist_ok=True)
 MAX_CONCURRENT_THREADS = os.cpu_count() * 2
 
 CACTUS_TOKEN = os.getenv("CACTUS_TOKEN")
+assert CACTUS_TOKEN is not None, "Please set the CACTUS_TOKEN environment variable."
+
+DTYPE = torch.float32

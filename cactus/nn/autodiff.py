@@ -180,6 +180,7 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
             (x, k_effective, 1.0),
             (x, v_effective, 1.0),
         ]
+        
         Q, K, V = cactus_matmul(bundles)
 
         if q_proj_bias is not None:
