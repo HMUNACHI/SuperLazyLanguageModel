@@ -77,7 +77,7 @@ We welcome open-source contributions to the **Cactus Library** (the Python-based
 
 ## Community & Support
 - **Slack/Discord:** [Coming soon](#) 
-- **Email:** henry@cactuscompute.com  
+- **Email:** founders@cactuscompute.com  
 - **Follow us on Twitter:** [@CactusCompute](#)
 
 ## License
