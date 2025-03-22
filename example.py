@@ -41,7 +41,7 @@ def mask_labels(example):
 
 batch_size = 2
 max_seq_len = 512
-model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+model_name = "Qwen/Qwen2-0.5B-Instruct"
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 

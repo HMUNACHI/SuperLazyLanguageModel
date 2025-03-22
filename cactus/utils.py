@@ -49,6 +49,7 @@ def download_weights(weight_dir, model_name):
     del model
 
 
+
 def remove_weights(weight_dir):
     if os.path.exists(weight_dir):
         if os.path.isdir(weight_dir):

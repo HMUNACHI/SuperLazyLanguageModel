@@ -1,6 +1,7 @@
 from cactus.common import WEIGHT_DIR
 from cactus.utils import download_weights, remove_weights
 import os
+from transformers import AutoConfig
 
 
 class CactusConfig:
@@ -40,7 +41,6 @@ class CactusConfig:
         lora_alpha=32,
         lora_r=8,
         lora_dropout=0.1,
-        framework="torch",
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -79,9 +79,14 @@ class CactusConfig:
         self.lora_alpha = lora_alpha
         self.lora_r = lora_r
         self.lora_dropout = lora_dropout
-        self.framework = framework
 
         model_dir = model_name.split("/")[-1]
         self.weight_dir = f"{WEIGHT_DIR}/{model_dir}"
 
         download_weights(self.weight_dir, model_name)
+
+        config = AutoConfig.from_pretrained(model_name, **kwargs)
+
+        for key, value in config.__dict__.items():
+            if hasattr(self, key):
+                setattr(self, key, value)

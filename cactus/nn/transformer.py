@@ -333,7 +333,11 @@ class CactusLanguageModel(nn.Module):
         self.loss_function = nn.CrossEntropyLoss()
         self.vocab_size = config.vocab_size
 
-        lm_head_weight_path = f"{config.weight_dir}/lm_head.weight.bin"
+        if config.tie_word_embeddings:
+            lm_head_weight_path = f"{config.weight_dir}/model.embed_tokens.weight.bin"
+        else:
+            lm_head_weight_path = f"{config.weight_dir}/lm_head.weight.bin"
+            
         self.lm_head = CactusLinear(
             config.hidden_size,
             config.vocab_size,
