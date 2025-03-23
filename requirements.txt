@@ -1,7 +1,4 @@
-datasets==3.4.1
-numpy==2.0.2
-pandas==2.2.3
-requests==2.32.3
-scipy==1.15.2
-torch==2.6.0
-transformers==4.49.0
+datasets
+numpy
+torch
+transformers

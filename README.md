@@ -11,7 +11,7 @@ Cactus Compute is on a mission to provide affordable, eco-friendly AI compute by
 1. Visit [cactuscompute.com](https://cactuscompute.com), sign up, and get your token.
 2. Install the package:
    ```bash
-   pip install cactus
+   pip install cactus-lib
    ```
 3. Set your token:
    ```bash
