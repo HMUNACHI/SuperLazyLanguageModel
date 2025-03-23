@@ -1,6 +1,7 @@
 import math
 import os
 import shutil
+import gc
 
 import random
 import numpy as np
@@ -47,6 +48,7 @@ def download_weights(weight_dir, model_name):
         param.detach().numpy().tofile(file_path)
 
     del model
+    gc.collect()
 
 
 

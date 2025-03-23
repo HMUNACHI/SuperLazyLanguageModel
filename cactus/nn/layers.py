@@ -3,6 +3,7 @@ from typing import Any, Optional, Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
+import gc
 
 from cactus.config import CactusConfig
 from cactus.nn.autodiff import (
@@ -427,6 +428,7 @@ class CactusAttention(nn.Module):
                 to_ram=False,
             )
         attn_output = CactusMatmulFunction.apply(attn_output, o_proj_weight.t(), 1.0)
+        gc.collect()
         return attn_output, attn_weights
 
     def cactus_attention_forward(
