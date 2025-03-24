@@ -7,7 +7,7 @@ from cactus.train import sft, prepare_dataset
 torch.manual_seed(42)
 
 name = "Qwen/Qwen2-0.5B-Instruct"
-dataset = load_dataset("yahma/alpaca-cleaned", split="train[:50]")
+dataset = load_dataset("yahma/alpaca-cleaned", split="train[:100]")
 
 dataset = prepare_dataset(
     model_name=name, 
@@ -25,4 +25,4 @@ model = CactusLanguageModel(
 )
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
-sft(model=model, dataset=dataset, optimizer=optimizer, batch_size=2, epochs=3)
+sft(model=model, dataset=dataset, optimizer=optimizer, batch_size=8, epochs=3)

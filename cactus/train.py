@@ -62,29 +62,31 @@ def prepare_dataset(model_name, instructions, responses, inputs=None, max_seq_le
 
 
 def sft(model, dataset, optimizer, batch_size=1, epochs=1):
-    total_examples = len(dataset["input_ids"])
+    mini_batch_size = len(dataset["input_ids"][0])
+    grad_accum_steps = batch_size // mini_batch_size
+    if grad_accum_steps < 1:
+        grad_accum_steps = 1
 
+    total_batches = len(dataset["input_ids"])
     for epoch in range(epochs):
         epoch_loss = 0
         model.train()
         optimizer.zero_grad()
-        clear_gradient_dir()
+        clear_gradient_dir() 
         accum_steps = 0
 
-        with tqdm(total=total_examples, desc=f"Epoch {epoch+1}") as pbar:
+        with tqdm(total=total_batches, desc=f"Epoch {epoch+1}") as pbar:
             zipped_dataset = zip(dataset["input_ids"], dataset["attention_mask"], dataset["labels"])
             for i, batch in enumerate(zipped_dataset, start=1):
                 batch_input, batch_mask, batch_labels = batch
-
                 output = model(input_ids=batch_input, attention_mask=batch_mask, labels=batch_labels)
                 loss = output.loss
-
-                loss = loss / batch_size
+                loss = loss / grad_accum_steps
                 loss.backward()
-                epoch_loss += loss.item() * batch_size  
+                epoch_loss += loss.item() * grad_accum_steps
                 accum_steps += 1
 
-                if accum_steps % batch_size == 0:
+                if accum_steps % grad_accum_steps == 0:
                     optimizer.step()
                     optimizer.zero_grad()
                     accum_steps = 0
