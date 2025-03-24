@@ -2,7 +2,6 @@ import torch
 from tqdm import tqdm
 from datasets import Dataset
 from transformers import AutoTokenizer
-from cactus.common import BATCH_SIZE
 from cactus.utils import clear_gradient_dir
 
 def format_example(example):
@@ -14,6 +13,15 @@ def format_example(example):
     return {"text": full_text, "prompt_text": prompt_text}
 
 def prepare_dataset(model_name, instructions, responses, inputs=None, max_seq_len=256):
+
+    if max_seq_len <= 128:
+        mini_batch_size = 8
+    elif 128 < max_seq_len <= 256:
+        mini_batch_size = 4
+    elif 256 > max_seq_len <= 512:
+        mini_batch_size = 2
+    else:
+        mini_batch_size = 1
 
     def tokenize_fn(example):
         tokenized = tokenizer(
@@ -50,14 +58,17 @@ def prepare_dataset(model_name, instructions, responses, inputs=None, max_seq_le
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     dataset = dataset.map(tokenize_fn)
     dataset = dataset.map(mask_labels)
+    
+    dataset = dataset.shuffle(seed=42)
+    
     input_ids = torch.tensor(dataset["input_ids"])
     attention_masks = torch.tensor(dataset["attention_mask"])
     labels = torch.tensor(dataset["labels"])
     print(f"Training on {input_ids.numel() // 1000}k tokens")
     return {
-        "input_ids": input_ids.split(BATCH_SIZE), 
-        "attention_mask": attention_masks.split(BATCH_SIZE), 
-        "labels": labels.split(BATCH_SIZE),
+        "input_ids": input_ids.split(mini_batch_size), 
+        "attention_mask": attention_masks.split(mini_batch_size), 
+        "labels": labels.split(mini_batch_size),
     }
 
 
