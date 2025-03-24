@@ -13,3 +13,5 @@ CACTUS_TOKEN = os.getenv("CACTUS_TOKEN")
 assert CACTUS_TOKEN is not None, "Please set the CACTUS_TOKEN environment variable."
 
 DTYPE = torch.float32
+BATCH_SIZE = 2
+MAX_GRAD_NORM = 0.1

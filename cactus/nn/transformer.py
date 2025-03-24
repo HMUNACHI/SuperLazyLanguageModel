@@ -326,21 +326,28 @@ class CactusTransformer(nn.Module):
 
 class CactusLanguageModel(nn.Module):
 
-    def __init__(self, config):
+    def __init__(self, name, lora_alpha=16, lora_r=4, lora_dropout=0.1):
         super().__init__()
-        self.model = CactusTransformer(config)
-        self.config = config
-        self.loss_function = nn.CrossEntropyLoss()
-        self.vocab_size = config.vocab_size
 
-        if config.tie_word_embeddings:
-            lm_head_weight_path = f"{config.weight_dir}/model.embed_tokens.weight.bin"
+        self.config = CactusConfig(
+            model_name=name,
+            lora_alpha=lora_alpha,
+            lora_r=lora_r,
+            lora_dropout=lora_dropout,
+        )
+        
+        self.model = CactusTransformer(self.config)
+        self.loss_function = nn.CrossEntropyLoss()
+        self.vocab_size = self.config.vocab_size
+
+        if self.config.tie_word_embeddings:
+            lm_head_weight_path = f"{self.config.weight_dir}/model.embed_tokens.weight.bin"
         else:
-            lm_head_weight_path = f"{config.weight_dir}/lm_head.weight.bin"
+            lm_head_weight_path = f"{self.config.weight_dir}/lm_head.weight.bin"
             
         self.lm_head = CactusLinear(
-            config.hidden_size,
-            config.vocab_size,
+            self.config.hidden_size,
+            self.config.vocab_size,
             weight_path=lm_head_weight_path,
             bias_path=None,
         )

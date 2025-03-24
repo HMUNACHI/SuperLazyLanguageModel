@@ -5,15 +5,15 @@ import torch.nn.functional as F
 from cactus.nn.ops import cactus_matmul
 from cactus.utils import load_tensor_from_storage, save_tensor_to_storage
 
-from cactus.common import GRADIENT_DIR
+from cactus.common import GRADIENT_DIR, MAX_GRAD_NORM
 
 
-def clip_grad(grad, max_norm):
+def clip_grad(grad):
     if grad is None:
         return None
     norm = grad.norm()
-    if norm > max_norm:
-        grad = grad * (max_norm / (norm + 1e-6))
+    if norm > MAX_GRAD_NORM:
+        grad = grad * (MAX_GRAD_NORM / (norm + 1e-6))
     return grad
 
 
@@ -30,10 +30,9 @@ class CactusMatmulFunction(torch.autograd.Function):
             (grad_output, B.transpose(-2, -1), 1.0), 
             (A.transpose(-2, -1), grad_output, 1.0)
         ]
-        max_grad_norm = 10
         grad_A, grad_B = cactus_matmul(bundles)
-        grad_A = clip_grad(grad_A, max_grad_norm)
-        grad_B = clip_grad(grad_B, max_grad_norm)
+        grad_A = clip_grad(grad_A)
+        grad_B = clip_grad(grad_B)
         return grad_A, grad_B, None
 
 class CactusBundledMatmulFunction(torch.autograd.Function):
@@ -242,26 +241,25 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
         ]
         grad_q_A, grad_q_B, grad_k_A, grad_k_B, grad_v_A, grad_v_B = cactus_matmul(bundles)
 
-        max_norm = 10
-        grad_x = clip_grad(grad_x, max_norm)
-        grad_q_bias = clip_grad(grad_q_bias, max_norm)
-        grad_k_bias = clip_grad(grad_k_bias, max_norm)
-        grad_v_bias = clip_grad(grad_v_bias, max_norm)
-        grad_q_A = clip_grad(grad_q_A, max_norm)
-        grad_q_B = clip_grad(grad_q_B, max_norm)
-        grad_k_A = clip_grad(grad_k_A, max_norm)
-        grad_k_B = clip_grad(grad_k_B, max_norm)
-        grad_v_A = clip_grad(grad_v_A, max_norm)
-        grad_v_B = clip_grad(grad_v_B, max_norm)
-        grad_effective_q = clip_grad(grad_effective_q, max_norm)
-        grad_effective_k = clip_grad(grad_effective_k, max_norm)
-        grad_effective_v = clip_grad(grad_effective_v, max_norm)
-        grad_xQ = clip_grad(grad_xQ, max_norm)
-        grad_xK = clip_grad(grad_xK, max_norm)
-        grad_xV = clip_grad(grad_xV, max_norm)
-        grad_Q = clip_grad(grad_Q, max_norm)
-        grad_K = clip_grad(grad_K, max_norm)
-        grad_V = clip_grad(grad_V, max_norm)
+        grad_x = clip_grad(grad_x)
+        grad_q_bias = clip_grad(grad_q_bias)
+        grad_k_bias = clip_grad(grad_k_bias)
+        grad_v_bias = clip_grad(grad_v_bias)
+        grad_q_A = clip_grad(grad_q_A)
+        grad_q_B = clip_grad(grad_q_B)
+        grad_k_A = clip_grad(grad_k_A)
+        grad_k_B = clip_grad(grad_k_B)
+        grad_v_A = clip_grad(grad_v_A)
+        grad_v_B = clip_grad(grad_v_B)
+        grad_effective_q = clip_grad(grad_effective_q)
+        grad_effective_k = clip_grad(grad_effective_k)
+        grad_effective_v = clip_grad(grad_effective_v)
+        grad_xQ = clip_grad(grad_xQ)
+        grad_xK = clip_grad(grad_xK)
+        grad_xV = clip_grad(grad_xV)
+        grad_Q = clip_grad(grad_Q)
+        grad_K = clip_grad(grad_K)
+        grad_V = clip_grad(grad_V)
 
         # Optionally, print the clipped gradient norms for debugging.
         # print(f"Clipped grad_x_norm: {grad_x.norm()}")

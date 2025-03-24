@@ -11,7 +11,8 @@ setup(
     install_requires=[
         "numpy",
         "transformers",
-        "platformdirs"
+        "platformdirs",
+        "tqdm",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -6,7 +6,7 @@ import gc
 import random
 import numpy as np
 
-from cactus.common import DTYPE
+from cactus.common import DTYPE, GRADIENT_DIR
 
 import torch
 from transformers import AutoModelForCausalLM
@@ -58,3 +58,9 @@ def remove_weights(weight_dir):
             shutil.rmtree(weight_dir)
         else:
             os.remove(weight_dir)
+
+
+def clear_gradient_dir():
+    if os.path.exists(GRADIENT_DIR):
+        shutil.rmtree(GRADIENT_DIR)
+    os.makedirs(GRADIENT_DIR, exist_ok=True)
