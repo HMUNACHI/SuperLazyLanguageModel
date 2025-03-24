@@ -45,7 +45,7 @@ model_name = "Qwen/Qwen2-0.5B-Instruct"
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-dataset = load_dataset("yahma/alpaca-cleaned", split="train[:10]")
+dataset = load_dataset("yahma/alpaca-cleaned", split="train[:1000]")
 formatted_dataset = dataset.map(format_example)
 tokenized_dataset = formatted_dataset.map(tokenize_fn)
 tokenized_dataset = tokenized_dataset.map(mask_labels)
