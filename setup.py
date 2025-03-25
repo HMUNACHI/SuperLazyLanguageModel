@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="cactus-lib",
-    version="0.1.3",
+    version="0.1.4",
     description="Framework for fine-tuning LLMs on the Cactus Compute platform",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
