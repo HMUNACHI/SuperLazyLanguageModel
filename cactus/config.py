@@ -1,7 +1,9 @@
+import os
+
+from transformers import AutoConfig
+
 from cactus.common import WEIGHT_DIR
 from cactus.utils import download_weights, remove_weights
-import os
-from transformers import AutoConfig
 
 
 class CactusConfig:
@@ -10,7 +12,7 @@ class CactusConfig:
 
     def __init__(
         self,
-        model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+        model_name="deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
         vocab_size=151936,
         bos_token_id=151643,
         eos_token_id=151643,

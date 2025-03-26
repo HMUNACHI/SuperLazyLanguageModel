@@ -4,22 +4,13 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from transformers import Cache, DynamicCache, SlidingWindowCache, StaticCache
-from transformers.modeling_outputs import (
-    BaseModelOutputWithPast,
-    CausalLMOutputWithPast,
-)
-
-from cactus.config import CactusConfig
-from cactus.nn.layers import (
-    CactusAttention,
-    CactusLinear,
-    CactusMLP,
-    CactusRMSNorm,
-    CactusRotaryEmbedding,
-    CactusEmbedding,
-)
+from transformers.modeling_outputs import (BaseModelOutputWithPast,
+                                           CausalLMOutputWithPast)
 
 from cactus.common import DTYPE
+from cactus.config import CactusConfig
+from cactus.nn.layers import (CactusAttention, CactusEmbedding, CactusLinear,
+                              CactusMLP, CactusRMSNorm, CactusRotaryEmbedding)
 
 
 class CactusDecoderLayer(nn.Module):
@@ -111,7 +102,9 @@ class CactusTransformer(nn.Module):
             ]
         )
         norm_weight_path = f"{config.weight_dir}/model.norm.weight.bin"
-        self.norm = CactusRMSNorm(config.hidden_size, weight_path=norm_weight_path, eps=config.rms_norm_eps)
+        self.norm = CactusRMSNorm(
+            config.hidden_size, weight_path=norm_weight_path, eps=config.rms_norm_eps
+        )
         self.rotary_emb = CactusRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
         self.config = config
@@ -335,16 +328,18 @@ class CactusLanguageModel(nn.Module):
             lora_r=lora_r,
             lora_dropout=lora_dropout,
         )
-        
+
         self.model = CactusTransformer(self.config)
         self.loss_function = nn.CrossEntropyLoss()
         self.vocab_size = self.config.vocab_size
 
         if self.config.tie_word_embeddings:
-            lm_head_weight_path = f"{self.config.weight_dir}/model.embed_tokens.weight.bin"
+            lm_head_weight_path = (
+                f"{self.config.weight_dir}/model.embed_tokens.weight.bin"
+            )
         else:
             lm_head_weight_path = f"{self.config.weight_dir}/lm_head.weight.bin"
-            
+
         self.lm_head = CactusLinear(
             self.config.hidden_size,
             self.config.vocab_size,
@@ -429,7 +424,7 @@ class CactusLanguageModel(nn.Module):
             shifted_labels = labels[:, 1:]
             loss = self.loss_function(
                 shifted_logits.reshape(-1, shifted_logits.size(-1)),
-                shifted_labels.reshape(-1)
+                shifted_labels.reshape(-1),
             )
 
         if not return_dict:

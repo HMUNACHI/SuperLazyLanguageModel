@@ -1,11 +1,11 @@
 import os
+
 import torch
 import torch.nn.functional as F
 
+from cactus.common import GRADIENT_DIR, MAX_GRAD_NORM
 from cactus.nn.ops import cactus_matmul
 from cactus.utils import load_tensor_from_storage, save_tensor_to_storage
-
-from cactus.common import GRADIENT_DIR, MAX_GRAD_NORM
 
 
 def clip_grad(grad):
@@ -27,13 +27,14 @@ class CactusMatmulFunction(torch.autograd.Function):
     def backward(ctx, grad_output):
         A, B = ctx.saved_tensors
         bundles = [
-            (grad_output, B.transpose(-2, -1), 1.0), 
-            (A.transpose(-2, -1), grad_output, 1.0)
+            (grad_output, B.transpose(-2, -1), 1.0),
+            (A.transpose(-2, -1), grad_output, 1.0),
         ]
         grad_A, grad_B = cactus_matmul(bundles)
         grad_A = clip_grad(grad_A)
         grad_B = clip_grad(grad_B)
         return grad_A, grad_B, None
+
 
 class CactusBundledMatmulFunction(torch.autograd.Function):
     @staticmethod
@@ -45,8 +46,7 @@ class CactusBundledMatmulFunction(torch.autograd.Function):
     def backward(ctx, grad_output):
         bundles = ctx.saved_tensors
         triple_list = [
-            (grad_output, bundle[1].transpose(-2, -1), 1.0)
-            for bundle in bundles
+            (grad_output, bundle[1].transpose(-2, -1), 1.0) for bundle in bundles
         ]
         grad_bundles = cactus_matmul(triple_list)
         return grad_bundles
@@ -78,7 +78,9 @@ class CactusLoraFunction(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        x = load_tensor_from_storage(ctx.x_path, shape=grad_output.shape, dtype=grad_output.dtype, to_ram=False)
+        x = load_tensor_from_storage(
+            ctx.x_path, shape=grad_output.shape, dtype=grad_output.dtype, to_ram=False
+        )
         A, B = ctx.saved_tensors
         scale = ctx.scale
 
@@ -90,10 +92,7 @@ class CactusLoraFunction(torch.autograd.Function):
         ]
         grad_x, E = cactus_matmul(bundles)
 
-        bundles = [
-            (E, B.transpose(-2, -1), scale), 
-            (A.transpose(-2, -1), E, scale)
-            ]
+        bundles = [(E, B.transpose(-2, -1), scale), (A.transpose(-2, -1), E, scale)]
         grad_A, grad_B = cactus_matmul(bundles)
 
         grad_w = None
@@ -138,7 +137,9 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
 
         # Save input x shape for later and store x on disk.
         ctx.x_shape = x.shape
-        ctx.x_path = os.path.join(GRADIENT_DIR, q_proj_weight_path.split("/")[-1] + ".x.bin")
+        ctx.x_path = os.path.join(
+            GRADIENT_DIR, q_proj_weight_path.split("/")[-1] + ".x.bin"
+        )
         save_tensor_to_storage(ctx.x_path, x)
 
         q_shape = (q_proj_lora_A.shape[0], x.shape[-1])
@@ -179,7 +180,7 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
             (x, k_effective, 1.0),
             (x, v_effective, 1.0),
         ]
-        
+
         Q, K, V = cactus_matmul(bundles)
 
         if q_proj_bias is not None:
@@ -202,7 +203,9 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
             v_proj_lora_B,
         ) = ctx.saved_tensors
         scale = ctx.scaling
-        x = load_tensor_from_storage(ctx.x_path, shape=ctx.x_shape, dtype=grad_Q.dtype, to_ram=False)
+        x = load_tensor_from_storage(
+            ctx.x_path, shape=ctx.x_shape, dtype=grad_Q.dtype, to_ram=False
+        )
 
         q_effective = ctx.q_effective
         k_effective = ctx.k_effective
@@ -239,7 +242,9 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
             (grad_effective_v, v_proj_lora_B.transpose(-2, -1), scale),
             (v_proj_lora_A.transpose(-2, -1), grad_effective_v, scale),
         ]
-        grad_q_A, grad_q_B, grad_k_A, grad_k_B, grad_v_A, grad_v_B = cactus_matmul(bundles)
+        grad_q_A, grad_q_B, grad_k_A, grad_k_B, grad_v_A, grad_v_B = cactus_matmul(
+            bundles
+        )
 
         grad_x = clip_grad(grad_x)
         grad_q_bias = clip_grad(grad_q_bias)
@@ -260,19 +265,6 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
         grad_Q = clip_grad(grad_Q)
         grad_K = clip_grad(grad_K)
         grad_V = clip_grad(grad_V)
-
-        # Optionally, print the clipped gradient norms for debugging.
-        # print(f"Clipped grad_x_norm: {grad_x.norm()}")
-        # print(f"Clipped grad_q_A_norm: {grad_q_A.norm()}")
-        # print(f"Clipped grad_q_B_norm: {grad_q_B.norm()}")
-        # print(f"Clipped grad_k_A_norm: {grad_k_A.norm()}")
-        # print(f"Clipped grad_k_B_norm: {grad_k_B.norm()}")
-        # print(f"Clipped grad_v_A_norm: {grad_v_A.norm()}")
-        # print(f"Clipped grad_v_B_norm: {grad_v_B.norm()}")
-        # print(f"Clipped grad_q_bias_norm: {grad_q_bias.norm()}")
-        # print(f"Clipped grad_k_bias_norm: {grad_k_bias.norm()}")
-        # print(f"Clipped grad_v_bias_norm: {grad_v_bias.norm()}")
-        # print("")
 
         grad_q_weight_path = None
         grad_k_weight_path = None

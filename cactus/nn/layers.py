@@ -1,19 +1,17 @@
+import gc
 from typing import Any, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
 from torch import nn
-import gc
 
-from cactus.config import CactusConfig
-from cactus.nn.autodiff import (
-    CactusBundledMatmulFunction,
-    CactusLoraFunction,
-    CactusLoraQKVLinearFunction,
-    CactusMatmulFunction,
-)
-from cactus.utils import load_tensor_from_storage
 from cactus.common import DTYPE
+from cactus.config import CactusConfig
+from cactus.nn.autodiff import (CactusBundledMatmulFunction,
+                                CactusLoraFunction,
+                                CactusLoraQKVLinearFunction,
+                                CactusMatmulFunction)
+from cactus.utils import load_tensor_from_storage
 
 
 class CactusEmbedding(torch.nn.Module):
@@ -116,7 +114,9 @@ class CactusRotaryEmbedding(nn.Module):
 class CactusRMSNorm(torch.nn.Module):
     def __init__(self, hidden_size, weight_path, eps=1e-6):
         super().__init__()
-        weight = load_tensor_from_storage(weight_path=weight_path, shape=hidden_size, to_ram=True)
+        weight = load_tensor_from_storage(
+            weight_path=weight_path, shape=hidden_size, to_ram=True
+        )
         self.register_buffer("weight", weight)
         self.variance_epsilon = eps
 
@@ -159,8 +159,8 @@ class CactusLinear(nn.Module):
             shape=(self.out_features, self.in_features),
             to_ram=False,
         ).t()
-        
-        Wx =  CactusMatmulFunction.apply(x, weight, 1.0)
+
+        Wx = CactusMatmulFunction.apply(x, weight, 1.0)
         if self.bias is not None:
             Wx += self.bias
         return Wx
@@ -212,7 +212,14 @@ class CactusMLP(nn.Module):
 
 class CactusLoraLinear(nn.Module):
     def __init__(
-        self, in_features, out_features, r, alpha, weight_path, bias_path=None, lora_dropout=0.0
+        self,
+        in_features,
+        out_features,
+        r,
+        alpha,
+        weight_path,
+        bias_path=None,
+        lora_dropout=0.0,
     ):
         super().__init__()
         self.in_features = in_features
@@ -223,7 +230,7 @@ class CactusLoraLinear(nn.Module):
         self.weight_path = weight_path
         self.lora_A = nn.Parameter(torch.randn(r, in_features))
         self.lora_B = nn.Parameter(torch.randn(out_features, r))
-        self.lora_dropout = nn.Dropout(lora_dropout) 
+        self.lora_dropout = nn.Dropout(lora_dropout)
         self.bias = None
         if bias_path is not None:
             with torch.no_grad():
@@ -235,7 +242,12 @@ class CactusLoraLinear(nn.Module):
     def forward(self, x):
         x_dropped = self.lora_dropout(x)
         return CactusLoraFunction.apply(
-            x_dropped, self.lora_A, self.lora_B, self.weight_path, self.scaling, self.bias
+            x_dropped,
+            self.lora_A,
+            self.lora_B,
+            self.weight_path,
+            self.scaling,
+            self.bias,
         )
 
 
@@ -260,21 +272,27 @@ class CactusLoraQKVLinear(nn.Module):
         )
         nn.init.kaiming_uniform_(self.q_proj_lora_A, nonlinearity="linear")
         self.q_proj_lora_B = nn.Parameter(
-            torch.zeros(config.lora_r, config.num_attention_heads * head_dim, dtype=DTYPE)
+            torch.zeros(
+                config.lora_r, config.num_attention_heads * head_dim, dtype=DTYPE
+            )
         )
         self.k_proj_lora_A = nn.Parameter(
             torch.randn(config.hidden_size, config.lora_r, dtype=DTYPE)
         )
         nn.init.kaiming_uniform_(self.k_proj_lora_A, nonlinearity="linear")
         self.k_proj_lora_B = nn.Parameter(
-            torch.zeros(config.lora_r, config.num_key_value_heads * head_dim, dtype=DTYPE)
+            torch.zeros(
+                config.lora_r, config.num_key_value_heads * head_dim, dtype=DTYPE
+            )
         )
         self.v_proj_lora_A = nn.Parameter(
             torch.randn(config.hidden_size, config.lora_r, dtype=DTYPE)
         )
         nn.init.kaiming_uniform_(self.v_proj_lora_A, nonlinearity="linear")
         self.v_proj_lora_B = nn.Parameter(
-            torch.zeros(config.lora_r, config.num_key_value_heads * head_dim, dtype=DTYPE)
+            torch.zeros(
+                config.lora_r, config.num_key_value_heads * head_dim, dtype=DTYPE
+            )
         )
 
         self.q_weight_path = q_weight_path
@@ -287,7 +305,7 @@ class CactusLoraQKVLinear(nn.Module):
 
         q_dim = config.num_attention_heads * head_dim
         kv_dim = config.num_key_value_heads * head_dim
-        
+
         if q_bias_path is not None:
             self.q_proj_bias = load_tensor_from_storage(
                 weight_path=q_bias_path, shape=(q_dim,), to_ram=True
@@ -445,7 +463,9 @@ class CactusAttention(nn.Module):
         key_states = self.repeat_kv(key, module.num_key_value_groups)
         value_states = self.repeat_kv(value, module.num_key_value_groups)
 
-        attn_weights = CactusMatmulFunction.apply(query, key_states.transpose(2, 3), scaling)
+        attn_weights = CactusMatmulFunction.apply(
+            query, key_states.transpose(2, 3), scaling
+        )
         if attention_mask is not None:
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
             attn_weights = attn_weights + causal_mask

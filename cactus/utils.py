@@ -1,15 +1,15 @@
+import gc
 import math
 import os
-import shutil
-import gc
-
 import random
+import shutil
+
 import numpy as np
+import torch
+from transformers import AutoModelForCausalLM
 
 from cactus.common import DTYPE, GRADIENT_DIR
 
-import torch
-from transformers import AutoModelForCausalLM
 
 def generate_job_id():
     return f"job{random.randint(0, 1000)}"
@@ -40,7 +40,7 @@ def download_weights(weight_dir, model_name):
 
     if os.path.exists(weight_dir):
         return
-    
+
     os.makedirs(weight_dir, exist_ok=True)
     model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=DTYPE)
 
@@ -50,7 +50,6 @@ def download_weights(weight_dir, model_name):
 
     del model
     gc.collect()
-
 
 
 def remove_weights(weight_dir):
