@@ -31,6 +31,7 @@ def load_tensor_from_storage(weight_path, shape, dtype=DTYPE, to_ram=False):
     return data
 
 
+@torch._dynamo.disable
 def save_tensor_to_storage(weight_path, data):
     data.contiguous().detach().numpy().tofile(weight_path)
 

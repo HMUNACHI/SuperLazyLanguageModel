@@ -14,3 +14,5 @@ assert CACTUS_TOKEN is not None, "Please set the CACTUS_TOKEN environment variab
 
 DTYPE = torch.float32
 MAX_GRAD_NORM = 0.1
+
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
