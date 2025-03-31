@@ -1,4 +1,13 @@
 from setuptools import find_packages, setup
+from torch.utils.cpp_extension import BuildExtension, CppExtension
+
+ext_modules = [
+    CppExtension(
+        name='cactus.kernels.matmul',  # accessible as cactus.kernels.matmul_cpp in Python
+        sources=['cactus/kernels/matmul.cpp'],
+        extra_compile_args=['-O3']
+    )
+]
 
 setup(
     name="cactus-lib",
@@ -13,7 +22,10 @@ setup(
         "transformers",
         "platformdirs",
         "tqdm",
+        "pybind11"
     ],
+    ext_modules=ext_modules,
+    cmdclass={"build_ext": BuildExtension},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
