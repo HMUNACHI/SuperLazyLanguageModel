@@ -25,4 +25,4 @@ model = CactusLanguageModel(
 )
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
-sft(model=model, dataset=dataset, optimizer=optimizer, batch_size=4, epochs=3)
+sft(model=model, dataset=dataset, optimizer=optimizer, batch_size=2, epochs=3)
