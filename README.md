@@ -28,8 +28,13 @@ We expressed the transformer forward pass and the backward vector-jacobian produ
 
 ## Supported Models 
 
-1. F
-2. DeepSeek-R1-Distill-Qwen-1.5B
+- deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+- Qwen/Qwen2.5-0.5B
+- Qwen/Qwen2.5-0.5B-Instruct
+- Qwen/Qwen2.5-1.5B
+- Qwen/Qwen2.5-1.5B-Instruct
+- Qwen/Qwen2.5-3B
+- Qwen/Qwen2.5-3B-Instruct
 
 ## Getting Started
 
