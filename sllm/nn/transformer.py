@@ -317,7 +317,7 @@ class Transformer(nn.Module):
         return causal_mask
 
 
-class LanguageModel(nn.Module):
+class SuperLazyLanguageModel(nn.Module):
 
     def __init__(self, name, lora_alpha=16, lora_r=4, lora_dropout=0.1):
         super().__init__()

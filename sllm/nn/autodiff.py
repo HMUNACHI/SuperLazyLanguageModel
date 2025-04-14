@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 
 from sllm.common import GRADIENT_DIR, MAX_GRAD_NORM
-from sllm.ops.matmul import bundled_scaled_matmul
+from sllm.ops import bundled_scaled_matmul
 from sllm.utils import load_tensor_from_storage, save_tensor_to_storage
 
 

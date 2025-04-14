@@ -6,7 +6,7 @@
 
 namespace py = pybind11;
 
-torch::Tensor remote_matmul(const torch::Tensor& A, const torch::Tensor& B, double scale) {
+torch::Tensor matmul(const torch::Tensor& A, const torch::Tensor& B, double scale) {
     return torch::matmul(A, B) * scale;
 }
 
@@ -30,7 +30,7 @@ std::vector<torch::Tensor> bundled_scaled_matmul(const std::vector<py::tuple>& m
         for (int64_t i = 0; i < batch; ++i) {
             auto A_i = A_reshaped[i];
             auto b_tensor = (B_reshaped.size(0) == 1) ? B_reshaped[0] : B_reshaped[i];
-            C[i] = remote_matmul(A_i, b_tensor, scale);
+            C[i] = matmul(A_i, b_tensor, scale);
         }
 
         std::vector<int64_t> result_shape;

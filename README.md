@@ -34,7 +34,7 @@ We expressed the transformer forward pass and the backward vector-jacobian produ
 ## Getting Started
 
 1. ```bash
-   pip install SLLMModel
+   pip install sllm-lib
    ```
 2. Initialize the model:
    ```python
