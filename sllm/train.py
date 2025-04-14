@@ -4,8 +4,8 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 import time  # add time module if not imported
 
-from cactus.utils import clear_gradient_dir
-from cactus.common import MINI_BATCH_SIZE
+from sllm.utils import clear_gradient_dir
+from sllm.common import MINI_BATCH_SIZE
 
 
 def format_example(example):

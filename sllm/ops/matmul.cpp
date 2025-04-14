@@ -10,7 +10,7 @@ torch::Tensor remote_matmul(const torch::Tensor& A, const torch::Tensor& B, doub
     return torch::matmul(A, B) * scale;
 }
 
-std::vector<torch::Tensor> scaled_matmul(const std::vector<py::tuple>& matmul_bundles) {
+std::vector<torch::Tensor> bundled_scaled_matmul(const std::vector<py::tuple>& matmul_bundles) {
     std::vector<torch::Tensor> results;
 
     for (const auto& bundle : matmul_bundles) {
@@ -44,5 +44,5 @@ std::vector<torch::Tensor> scaled_matmul(const std::vector<py::tuple>& matmul_bu
 }
 
 PYBIND11_MODULE(matmul, m) {
-    m.def("scaled_matmul", &scaled_matmul, "Distributes bundels of matmul operations to remote devices concurrently");
+    m.def("bundled_scaled_matmul", &bundled_scaled_matmul, "Distributes bundels of matmul operations to remote devices concurrently");
 }

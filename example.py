@@ -1,8 +1,8 @@
 import torch
 from datasets import load_dataset
 
-from cactus.nn import CactusLanguageModel
-from cactus.train import prepare_dataset, sft
+from sllm.nn import SuperLazyLanguageModel
+from sllm.train import prepare_dataset, sft
 
 torch.manual_seed(42)
 
@@ -17,7 +17,7 @@ dataset = prepare_dataset(
     max_seq_len=256,
 )
 
-model = CactusLanguageModel(
+model = SuperLazyLanguageModel(
     name=name,
     lora_alpha=16,
     lora_r=4,

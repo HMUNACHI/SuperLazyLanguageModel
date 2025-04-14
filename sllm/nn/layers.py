@@ -5,16 +5,16 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from cactus.common import DTYPE
-from cactus.config import CactusConfig
-from cactus.nn.autodiff import (CactusBundledMatmulFunction,
-                                CactusLoraFunction,
-                                CactusLoraQKVLinearFunction,
-                                CactusMatmulFunction)
-from cactus.utils import load_tensor_from_storage
+from sllm.common import DTYPE
+from sllm.config import Config
+from sllm.nn.autodiff import (BundledMatmulFunction,
+                                LoraFunction,
+                                LoraQKVLinearFunction,
+                                MatmulFunction)
+from sllm.utils import load_tensor_from_storage
 
 
-class CactusEmbedding(torch.nn.Module):
+class Embedding(torch.nn.Module):
     def __init__(self, weight_path, vocab_size, hidden_size, padding_idx=None):
         super().__init__()
         self.weight_path = weight_path
@@ -32,8 +32,8 @@ class CactusEmbedding(torch.nn.Module):
         return weight[input_ids]
 
 
-class CactusRotaryEmbedding(nn.Module):
-    def __init__(self, config: CactusConfig):
+class RotaryEmbedding(nn.Module):
+    def __init__(self, config: Config):
         super().__init__()
         self.max_seq_len_cached = config.max_position_embeddings
         self.original_max_seq_len = config.max_position_embeddings
@@ -92,7 +92,7 @@ class CactusRotaryEmbedding(nn.Module):
 
     def compute_rope_parameters(
         self,
-        config: Optional[CactusConfig] = None,
+        config: Optional[Config] = None,
     ) -> Tuple["torch.Tensor", float]:
         partial_rotary_factor = (
             config.partial_rotary_factor
@@ -111,7 +111,7 @@ class CactusRotaryEmbedding(nn.Module):
         return inv_freq, attention_factor
 
 
-class CactusRMSNorm(torch.nn.Module):
+class RMSNorm(torch.nn.Module):
     def __init__(self, hidden_size, weight_path, eps=1e-6):
         super().__init__()
         weight = load_tensor_from_storage(
@@ -131,10 +131,10 @@ class CactusRMSNorm(torch.nn.Module):
         return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
 
 
-class CactusLinear(nn.Module):
+class Linear(nn.Module):
     def __init__(self, in_features, out_features, weight_path, bias_path=None):
         """
-        CactusLinear lazily loads a large weight matrix from disk on every forward pass
+        Linear lazily loads a large weight matrix from disk on every forward pass
         with gradients disabled. The bias, being much smaller, is loaded entirely into RAM.
         Both weight and bias are not tracked by autograd.
         """
@@ -160,13 +160,13 @@ class CactusLinear(nn.Module):
             to_ram=False,
         ).t()
 
-        Wx = CactusMatmulFunction.apply(x, weight, 1.0)
+        Wx = MatmulFunction.apply(x, weight, 1.0)
         if self.bias is not None:
             Wx += self.bias
         return Wx
 
 
-class CactusMLP(nn.Module):
+class MLP(nn.Module):
     def __init__(self, config, layer_idx):
         super().__init__()
         self.config = config
@@ -205,12 +205,12 @@ class CactusMLP(nn.Module):
             (x, gate_proj.t(), 1.0),
             (x, up_proj.t(), 1.0),
         ]
-        gate_proj_out, up_proj_out = CactusBundledMatmulFunction.apply(bundles)
+        gate_proj_out, up_proj_out = BundledMatmulFunction.apply(bundles)
         activated_gate_proj = self.act_fn(gate_proj_out) * up_proj_out
-        return CactusMatmulFunction.apply(activated_gate_proj, down_proj.t(), 1.0)
+        return MatmulFunction.apply(activated_gate_proj, down_proj.t(), 1.0)
 
 
-class CactusLoraLinear(nn.Module):
+class LoraLinear(nn.Module):
     def __init__(
         self,
         in_features,
@@ -241,7 +241,7 @@ class CactusLoraLinear(nn.Module):
 
     def forward(self, x):
         x_dropped = self.lora_dropout(x)
-        return CactusLoraFunction.apply(
+        return LoraFunction.apply(
             x_dropped,
             self.lora_A,
             self.lora_B,
@@ -251,7 +251,7 @@ class CactusLoraLinear(nn.Module):
         )
 
 
-class CactusLoraQKVLinear(nn.Module):
+class LoraQKVLinear(nn.Module):
     def __init__(
         self,
         config,
@@ -323,7 +323,7 @@ class CactusLoraQKVLinear(nn.Module):
 
     def forward(self, x):
         x_dropped = self.lora_dropout(x)
-        return CactusLoraQKVLinearFunction.apply(
+        return LoraQKVLinearFunction.apply(
             x_dropped,
             self.q_weight_path,
             self.k_weight_path,
@@ -341,8 +341,8 @@ class CactusLoraQKVLinear(nn.Module):
         )
 
 
-class CactusAttention(nn.Module):
-    def __init__(self, config: CactusConfig, layer_idx: int):
+class Attention(nn.Module):
+    def __init__(self, config: Config, layer_idx: int):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
@@ -378,7 +378,7 @@ class CactusAttention(nn.Module):
             f"{config.weight_dir}/model.layers.{layer_idx}.self_attn.o_proj.weight.bin"
         )
 
-        self.lora = CactusLoraQKVLinear(
+        self.lora = LoraQKVLinear(
             config,
             self.head_dim,
             self.q_proj_weight_path,
@@ -425,7 +425,7 @@ class CactusAttention(nn.Module):
         ):
             sliding_window = self.config.sliding_window
 
-        attn_output, attn_weights = self.cactus_attention_forward(
+        attn_output, attn_weights = self.attention_forward(
             self,
             query_states,
             key_states,
@@ -445,11 +445,11 @@ class CactusAttention(nn.Module):
                 shape=(self.config.hidden_size, self.config.hidden_size),
                 to_ram=False,
             )
-        attn_output = CactusMatmulFunction.apply(attn_output, o_proj_weight.t(), 1.0)
+        attn_output = MatmulFunction.apply(attn_output, o_proj_weight.t(), 1.0)
         gc.collect()
         return attn_output, attn_weights
 
-    def cactus_attention_forward(
+    def attention_forward(
         self,
         module: nn.Module,
         query: torch.Tensor,
@@ -463,7 +463,7 @@ class CactusAttention(nn.Module):
         key_states = self.repeat_kv(key, module.num_key_value_groups)
         value_states = self.repeat_kv(value, module.num_key_value_groups)
 
-        attn_weights = CactusMatmulFunction.apply(
+        attn_weights = MatmulFunction.apply(
             query, key_states.transpose(2, 3), scaling
         )
         if attention_mask is not None:
@@ -476,7 +476,7 @@ class CactusAttention(nn.Module):
         attn_weights = nn.functional.dropout(
             attn_weights, p=dropout, training=module.training
         )
-        attn_output = CactusMatmulFunction.apply(attn_weights, value_states, 1.0)
+        attn_output = MatmulFunction.apply(attn_weights, value_states, 1.0)
         attn_output = attn_output.transpose(1, 2).contiguous()
         return attn_output, attn_weights
 

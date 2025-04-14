@@ -2,44 +2,63 @@
   <img src="assets/logo.png" alt="Alt text"/>
 </p>
 
+![License](https://img.shields.io/github/license/hmunachi/SuperLazyLanguageModel?style=flat-square)[![LinkedIn](https://img.shields.io/badge/-LinkedIn-blue?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com//company/80434055) [![Twitter](https://img.shields.io/twitter/follow/hmunachii?style=social)](https://twitter.com/hmunachii)
+
+Author: [Henry Ndubuaku](https://www.linkedin.com/in/henry-ndubuaku-7b6350b8/)
+
 ## Overview
 
-Cactus Compute is on a mission to provide affordable, eco-friendly AI compute by harnessing the vast, untapped power of idle mobile devices. We connect everyday smartphone owners to teams, researchers, and businesses running ML workloads, resulting in lower costs, reduced carbon footprints, and a democratized AI ecosystem.
+I mean, do not train or fine-tune LLMs on your laptop, traing is done at much higher precision than inference (float32 or bfload16). Also, additional memory is often used for the gradients, optimizer states, and batch size. So, 4 - 6x the model size. For simplicity, around 8-24G of RAM per 1B params. 
+
+HOWEVER, if you must do so on a laptop for whatever weird reason, this library implements most language models such that only the weights for each layer is loaded to the RAM, it implements LoRA fine-tuning such that frozen params are memory-mapped rather than loaded.
+
+Note the following:
+1) Compute intensity = computation time / communication time, and maximisin this means maximising GPU utilisation. 
+2) Many computations in transformer models can be parallelised, QKV projections for example. 
+3) Most operations in transformers follow the signature A @ B * Scale, A.K.A scaled dot-product. 
+4) Q @ K.T / sqrt(dimK) is obiously equivalent to Q @ K.T * dimK^(-1/2)
+5) But Lora_A @ Lora_B = Lora_A @ Lora_B * 1, also A * B = I @ A * B, and so on.
+
+We expressed the transformer forward pass and the backward vector-jacobian products for each layer as a bunch of scaled matmuls, which are bundled together and executed in parallel across different CPU cores as C++ extensions to bypass GIL. This concept makes it easy for an upcoming feature, where each bundle could be distributed across your friends' laptops, such that they only execute one operation called Bundled Scaled Matmul. You're welcome.
+
+## Limitations 
+
+1) Gradient accumulation, gradient checkpointing and lazy execution trade time-complexity for memory-efficiency, but you have no choice, do you?
+2) Yeah...your laptop will definitley heat up, GPUs burn up at data centers and cost so much to cool, your laptop is not special. 
+
+## Supported Models 
+
+1. F
+2. DeepSeek-R1-Distill-Qwen-1.5B
 
 ## Getting Started
 
-1. Visit [cactuscompute.com](https://cactuscompute.com), sign up, and get your token.
-2. Install the package:
-   ```bash
-   pip install cactus-lib
+1. ```bash
+   pip install SLLMModel
    ```
-3. Set your token:
-   ```bash
-   export CACTUS_TOKEN=<your-token-from-the-website>
-   ```
-4. Initialize the model:
+2. Initialize the model:
    ```python
-   from cactus.nn import CactusLanguageModel
-   from cactus.config import CactusConfig
+   from sllm.nn import SuperLazyLanguageModel
+   from sllm.config import Config
 
-   config = CactusConfig(
+   config = Config(
        model_name="deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
        lora_alpha=32,
        lora_r=8,
        lora_dropout=0.1,
    )
 
-   model = CactusLanguageModel(config)
+   model = SuperLazyLanguageModel(config)
 
    # Train like a normal pytorch model
    ```
-4. You can use Cactus functionalities:
+4. You can use SLLM functionalities:
    ```python
    import torch
    from datasets import load_dataset
 
-   from cactus.nn import CactusLanguageModel
-   from cactus.train import sft, prepare_dataset
+   from sllm.nn import SuperLazyLanguageModel
+   from sllm.train import sft, prepare_dataset
 
    torch.manual_seed(42)
 
@@ -54,7 +73,7 @@ Cactus Compute is on a mission to provide affordable, eco-friendly AI compute by
       max_seq_len=256,
    )
 
-   model = CactusLanguageModel(
+   model = SuperLazyLanguageModel(
       name=name, 
       lora_alpha=32, 
       lora_r=8, 
@@ -65,51 +84,10 @@ Cactus Compute is on a mission to provide affordable, eco-friendly AI compute by
    sft(model=model, dataset=dataset, optimizer=optimizer, batch_size=8, epochs=3)
    ```
 
-- **Demo:** [Watch our performance comparison against an NVIDIA A100 »](https://cactuscompute.com)
-
-## Why Cactus Compute?
-1. **Cost Savings:** Train and fine-tune ML models at a fraction of the cost of traditional cloud GPUs.  
-2. **Sustainability:** Mobile GPUs are more energy-efficient than data-center GPUs, drastically reducing carbon footprints.  
-3. **Accessibility:** We aim to empower smaller teams, individual researchers, and organizations with limited budgets to access robust AI compute.  
-4. **Simplicity:** The Cactus Library seamlessly integrates with popular ML frameworks (PyTorch, TensorFlow, JAX) without complex cluster configurations.  
-5. **Democratized Earnings:** Individuals earn passive income by securely sharing the idle capacity of their phones.
-
-
-## How It Works
-1. **Install the Cactus App (Providers):** Individuals install the app on their phone, which automatically contributes GPU/CPU cycles when the device is idle and charging.  
-2. **Build with the Cactus Library (Consumers):** ML teams include the Cactus Library (`pip install cactus`) in their training scripts and simply point their training job to the Cactus network.  
-3. **Automated Distribution:** Our backend, **Cactus Tango**, splits and routes jobs to available mobile devices, ensuring load balancing, fault tolerance, and efficient data transfer.  
-4. **Optimized Execution:** **Cactus Ferra**, our proprietary kernel, accelerates deep learning workloads on mobile hardware, matching a single data-center GPU’s performance with a collection of consumer devices.
-
-## Privacy & Security
-- **Data Encryption:** End-to-end encryption in transit and at rest using TLS/SSL.  
-- **Ephemeral Storage:** No training data or model weights are written to disk; everything is processed in volatile RAM.  
-- **Randomized Task Allocation:** Individual devices receive small, randomized pieces of workloads, preventing reconstruction of any meaningful data.  
-
-## Get Involved
-### For Compute Providers
-- **Sign up for Early Access:** [Join the waitlist »](https://cactuscompute.com)  
-- **Install the Cactus App:** Coming soon on [Google Play](https://cactuscompute.com)  
-- **Passive Earnings:** Earn money for every successful training epoch contributed.
-
-### For Compute Consumers (ML Teams, Researchers, Businesses)
-- **Early Beta Access:** [Request an invite »](https://cactuscompute.com)  
-- **Documentation & Examples:** [Read the Docs »](#)  
-- **Pricing:** Pay only for *runtime* (actual computation), typically at 50% below cloud GPU costs.
-
 ## Contributing
-We welcome open-source contributions to the **Cactus Library** (the Python-based interface for distributing ML workloads). Whether you’re improving documentation, optimizing kernels, or adding new features, your help is invaluable.
+Whether you’re improving documentation, optimizing kernels, or adding new features, your help is invaluable.
 
-1. Fork this repository.  
-2. Create a feature branch (`git checkout -b feature/awesome-improvement`).  
-3. Commit your changes (`git commit -m 'Add awesome feature'`).  
-4. Push to the branch (`git push origin feature/awesome-improvement`).  
-5. Open a Pull Request.  
-
-## Community & Support
-- **Slack/Discord:** [Coming soon](#) 
-- **Email:** founders@cactuscompute.com  
-- **Follow us on Twitter:** [@CactusCompute](#)
-
-## License
-- **Cactus Library:** Open source (Apache 2.0).
+1. Create a feature branch (`git checkout -b feature/awesome-improvement`).  
+2. Commit your changes (`git commit -m 'Add awesome feature'`).  
+3. Push to the branch (`git push origin feature/awesome-improvement`).  
+4. Open a Pull Request.  

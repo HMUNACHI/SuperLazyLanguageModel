@@ -2,11 +2,11 @@ import os
 
 from transformers import AutoConfig
 
-from cactus.common import WEIGHT_DIR
-from cactus.utils import download_weights, remove_weights
+from sllm.common import WEIGHT_DIR
+from sllm.utils import download_weights, remove_weights
 
 
-class CactusConfig:
+class Config:
     model_type = "transformer"
     keys_to_ignore_at_inference = ["past_key_values"]
 

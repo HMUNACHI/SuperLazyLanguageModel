@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from transformers import AutoModelForCausalLM
 
-from cactus.common import DTYPE, GRADIENT_DIR
+from sllm.common import DTYPE, GRADIENT_DIR
 
 
 def generate_job_id():

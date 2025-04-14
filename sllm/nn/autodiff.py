@@ -3,9 +3,9 @@ import os
 import torch
 import torch.nn.functional as F
 
-from cactus.common import GRADIENT_DIR, MAX_GRAD_NORM
-from cactus.nn.ops import cactus_matmul
-from cactus.utils import load_tensor_from_storage, save_tensor_to_storage
+from sllm.common import GRADIENT_DIR, MAX_GRAD_NORM
+from sllm.ops.matmul import bundled_scaled_matmul
+from sllm.utils import load_tensor_from_storage, save_tensor_to_storage
 
 
 def clip_grad(grad):
@@ -17,11 +17,11 @@ def clip_grad(grad):
     return grad
 
 
-class CactusMatmulFunction(torch.autograd.Function):
+class MatmulFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, A, B, scale):
         ctx.save_for_backward(A, B)
-        return cactus_matmul([(A, B, scale)])[0]
+        return bundled_scaled_matmul([(A, B, scale)])[0]
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -30,17 +30,17 @@ class CactusMatmulFunction(torch.autograd.Function):
             (grad_output, B.transpose(-2, -1), 1.0),
             (A.transpose(-2, -1), grad_output, 1.0),
         ]
-        grad_A, grad_B = cactus_matmul(bundles)
+        grad_A, grad_B = bundled_scaled_matmul(bundles)
         grad_A = clip_grad(grad_A)
         grad_B = clip_grad(grad_B)
         return grad_A, grad_B, None
 
 
-class CactusBundledMatmulFunction(torch.autograd.Function):
+class BundledMatmulFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, bundles):
         ctx.save_for_backward(*bundles)
-        return cactus_matmul(bundles)
+        return bundled_scaled_matmul(bundles)
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -48,11 +48,11 @@ class CactusBundledMatmulFunction(torch.autograd.Function):
         triple_list = [
             (grad_output, bundle[1].transpose(-2, -1), 1.0) for bundle in bundles
         ]
-        grad_bundles = cactus_matmul(triple_list)
+        grad_bundles = bundled_scaled_matmul(triple_list)
         return grad_bundles
 
 
-class CactusLoraFunction(torch.autograd.Function):
+class LoraFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, A, B, W_path, scale, bias=None):
         ctx.save_for_backward(A, B)
@@ -68,7 +68,7 @@ class CactusLoraFunction(torch.autograd.Function):
         )
 
         effective_W = W + (A @ B * scale)
-        Wx = cactus_matmul([(x, effective_W.transpose(-2, -1), 1.0)])[0]
+        Wx = bundled_scaled_matmul([(x, effective_W.transpose(-2, -1), 1.0)])[0]
 
         ctx.effecttive_weight = effective_W
 
@@ -90,10 +90,10 @@ class CactusLoraFunction(torch.autograd.Function):
             (grad_output, effective_W, 1.0),
             (x.transpose(-2, -1), grad_output, 1.0),
         ]
-        grad_x, E = cactus_matmul(bundles)
+        grad_x, E = bundled_scaled_matmul(bundles)
 
         bundles = [(E, B.transpose(-2, -1), scale), (A.transpose(-2, -1), E, scale)]
-        grad_A, grad_B = cactus_matmul(bundles)
+        grad_A, grad_B = bundled_scaled_matmul(bundles)
 
         grad_w = None
         grad_scale = None
@@ -102,7 +102,7 @@ class CactusLoraFunction(torch.autograd.Function):
         return grad_x, grad_A, grad_B, grad_w, grad_scale, grad_b
 
 
-class CactusLoraQKVLinearFunction(torch.autograd.Function):
+class LoraQKVLinearFunction(torch.autograd.Function):
     @staticmethod
     def forward(
         ctx,
@@ -181,7 +181,7 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
             (x, v_effective, 1.0),
         ]
 
-        Q, K, V = cactus_matmul(bundles)
+        Q, K, V = bundled_scaled_matmul(bundles)
 
         if q_proj_bias is not None:
             Q = Q + q_proj_bias
@@ -226,7 +226,7 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
             grad_effective_q,
             grad_effective_k,
             grad_effective_v,
-        ) = cactus_matmul(bundles)
+        ) = bundled_scaled_matmul(bundles)
 
         grad_x = grad_xQ + grad_xK + grad_xV
 
@@ -242,7 +242,7 @@ class CactusLoraQKVLinearFunction(torch.autograd.Function):
             (grad_effective_v, v_proj_lora_B.transpose(-2, -1), scale),
             (v_proj_lora_A.transpose(-2, -1), grad_effective_v, scale),
         ]
-        grad_q_A, grad_q_B, grad_k_A, grad_k_B, grad_v_A, grad_v_B = cactus_matmul(
+        grad_q_A, grad_q_B, grad_k_A, grad_k_B, grad_v_A, grad_v_B = bundled_scaled_matmul(
             bundles
         )
 

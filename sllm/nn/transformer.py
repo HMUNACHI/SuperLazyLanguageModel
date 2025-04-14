@@ -7,30 +7,30 @@ from transformers import Cache, DynamicCache, SlidingWindowCache, StaticCache
 from transformers.modeling_outputs import (BaseModelOutputWithPast,
                                            CausalLMOutputWithPast)
 
-from cactus.common import DTYPE
-from cactus.config import CactusConfig
-from cactus.nn.layers import (CactusAttention, CactusEmbedding, CactusLinear,
-                              CactusMLP, CactusRMSNorm, CactusRotaryEmbedding)
+from sllm.common import DTYPE
+from sllm.config import Config
+from sllm.nn.layers import (Attention, Embedding, Linear,
+                              MLP, RMSNorm, RotaryEmbedding)
 
 
-class CactusDecoderLayer(nn.Module):
-    def __init__(self, config: CactusConfig, layer_idx: int):
+class DecoderLayer(nn.Module):
+    def __init__(self, config: Config, layer_idx: int):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.self_attn = CactusAttention(config=config, layer_idx=layer_idx)
-        self.mlp = CactusMLP(config, layer_idx)
+        self.self_attn = Attention(config=config, layer_idx=layer_idx)
+        self.mlp = MLP(config, layer_idx)
 
         input_layer_norm_weight_path = (
             f"{config.weight_dir}/model.layers.{layer_idx}.input_layernorm.weight.bin"
         )
         post_attention_layer_norm_weight_path = f"{config.weight_dir}/model.layers.{layer_idx}.post_attention_layernorm.weight.bin"
 
-        self.input_layernorm = CactusRMSNorm(
+        self.input_layernorm = RMSNorm(
             hidden_size=config.hidden_size,
             weight_path=input_layer_norm_weight_path,
             eps=config.rms_norm_eps,
         )
-        self.post_attention_layernorm = CactusRMSNorm(
+        self.post_attention_layernorm = RMSNorm(
             hidden_size=config.hidden_size,
             weight_path=post_attention_layer_norm_weight_path,
             eps=config.rms_norm_eps,
@@ -79,17 +79,17 @@ class CactusDecoderLayer(nn.Module):
         return outputs
 
 
-class CactusTransformer(nn.Module):
+class Transformer(nn.Module):
     """
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`DecoderLayer`]
     """
 
-    def __init__(self, config: CactusConfig):
+    def __init__(self, config: Config):
         super().__init__()
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
-        self.embed_tokens = CactusEmbedding(
+        self.embed_tokens = Embedding(
             vocab_size=config.vocab_size,
             hidden_size=config.hidden_size,
             padding_idx=self.padding_idx,
@@ -97,15 +97,15 @@ class CactusTransformer(nn.Module):
         )
         self.layers = nn.ModuleList(
             [
-                CactusDecoderLayer(config, layer_idx)
+                DecoderLayer(config, layer_idx)
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
         norm_weight_path = f"{config.weight_dir}/model.norm.weight.bin"
-        self.norm = CactusRMSNorm(
+        self.norm = RMSNorm(
             config.hidden_size, weight_path=norm_weight_path, eps=config.rms_norm_eps
         )
-        self.rotary_emb = CactusRotaryEmbedding(config=config)
+        self.rotary_emb = RotaryEmbedding(config=config)
         self.gradient_checkpointing = False
         self.config = config
 
@@ -266,7 +266,7 @@ class CactusTransformer(nn.Module):
         device: torch.device,
         cache_position: torch.Tensor,
         batch_size: int,
-        config: CactusConfig,
+        config: Config,
         past_key_values: dict,
     ):
         """
@@ -317,19 +317,19 @@ class CactusTransformer(nn.Module):
         return causal_mask
 
 
-class CactusLanguageModel(nn.Module):
+class LanguageModel(nn.Module):
 
     def __init__(self, name, lora_alpha=16, lora_r=4, lora_dropout=0.1):
         super().__init__()
 
-        self.config = CactusConfig(
+        self.config = Config(
             model_name=name,
             lora_alpha=lora_alpha,
             lora_r=lora_r,
             lora_dropout=lora_dropout,
         )
 
-        self.model = CactusTransformer(self.config)
+        self.model = Transformer(self.config)
         self.loss_function = nn.CrossEntropyLoss()
         self.vocab_size = self.config.vocab_size
 
@@ -340,7 +340,7 @@ class CactusLanguageModel(nn.Module):
         else:
             lm_head_weight_path = f"{self.config.weight_dir}/lm_head.weight.bin"
 
-        self.lm_head = CactusLinear(
+        self.lm_head = Linear(
             self.config.hidden_size,
             self.config.vocab_size,
             weight_path=lm_head_weight_path,
