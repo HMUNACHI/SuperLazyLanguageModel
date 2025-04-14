@@ -1,3 +1,15 @@
+"""
+This module defines the configuration class for the transformer-based model.
+It encapsulates all the hyperparameters and weight configurations required for the model
+and handles downloading and merging with the pretrained configuration from Hugging Face.
+
+Key functionalities include:
+    - Setting model hyperparameters such as hidden size, number of layers, attention heads, etc.
+    - Configuring LoRA (Low-Rank Adaptation) parameters for efficient fine-tuning.
+    - Downloading necessary weights for the specified model.
+    - Overwriting default parameters with those from the pretrained configuration.
+"""
+
 import os
 
 from transformers import AutoConfig
@@ -7,6 +19,20 @@ from sllm.utils import download_weights, remove_weights
 
 
 class Config:
+    """
+    A configuration object for initializing the transformer-based model.
+
+    This class holds various hyperparameters required by the model. It downloads pretrained
+    weights if needed and loads configurations from a pretrained model, overriding any matching 
+    attributes provided in the constructor. In addition to standard model settings, it also 
+    includes configuration details for LoRA adaptation.
+
+    Class Attributes:
+        model_type (str): Default type of the model, set to "transformer".
+        keys_to_ignore_at_inference (List[str]): List of keys (e.g., "past_key_values") to be 
+            ignored during inference.
+    """
+
     model_type = "transformer"
     keys_to_ignore_at_inference = ["past_key_values"]
 
@@ -45,6 +71,20 @@ class Config:
         lora_dropout=0.1,
         **kwargs,
     ):
+        """
+        Initialize the Config object with the provided hyperparameters and then update with the pretrained configuration.
+
+        The initialization process involves:
+            1. Setting initial values for many model hyperparameters and LoRA parameters.
+            2. Determining the local weight directory based on the provided model name.
+            3. Downloading the pretrained weights (if not already present) into the specified directory.
+            4. Loading additional configuration parameters from the pretrained model via AutoConfig,
+               and updating the current configuration for any matching attributes.
+
+        Side Effects:
+            - Downloads the pretrained weights (if not already available) to a local weight directory.
+            - Updates attributes of this Config instance based on the pretrained model's configuration.
+        """
         self.vocab_size = vocab_size
         self.max_position_embeddings = max_position_embeddings
         self.hidden_size = hidden_size
@@ -82,13 +122,17 @@ class Config:
         self.lora_r = lora_r
         self.lora_dropout = lora_dropout
 
+        # Determine local weight storage directory based on the model name.
         model_dir = model_name.split("/")[-1]
         self.weight_dir = f"{WEIGHT_DIR}/{model_dir}"
 
+        # Ensure that the pretrained weights are downloaded locally.
         download_weights(self.weight_dir, model_name)
 
+        # Load additional configuration parameters from the pretrained model.
         config = AutoConfig.from_pretrained(model_name, **kwargs)
 
+        # Overwrite any matching attributes in this Config instance with the pretrained values.
         for key, value in config.__dict__.items():
             if hasattr(self, key):
                 setattr(self, key, value)

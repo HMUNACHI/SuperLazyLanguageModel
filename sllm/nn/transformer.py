@@ -1,3 +1,15 @@
+"""
+This module implements a Transformer-based language model with support for decoder layers,
+gradient checkpointing, and caching mechanisms. It defines the following classes:
+
+    - DecoderLayer: Implements a single layer of the transformer decoder.
+    - Transformer: Composes multiple decoder layers into a full transformer model.
+    - SuperLazyLanguageModel: Encapsulates the transformer and head for sequence generation tasks.
+
+The implementation leverages PyTorch for tensor computations and Hugging Face transformers
+for cache management.
+"""
+
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -14,7 +26,31 @@ from sllm.nn.layers import (Attention, Embedding, Linear,
 
 
 class DecoderLayer(nn.Module):
+    """
+    A single decoder layer of the Transformer.
+
+    This layer consists of:
+        - RMS normalization applied to the input (input_layernorm).
+        - A self-attention mechanism (self_attn).
+        - A residual connection adding the result back to the input.
+        - A second RMS normalization (post_attention_layernorm) followed by a feed-forward MLP,
+          with an additional residual connection.
+
+    Args:
+        config (Config): Configuration object containing model hyperparameters.
+        layer_idx (int): Index of the layer to load layer-specific weights.
+    """
+
     def __init__(self, config: Config, layer_idx: int):
+        """
+        Initialize the decoder layer.
+
+        Loads layer-specific weights for normalization from the provided weight directory.
+
+        Args:
+            config (Config): Model configuration.
+            layer_idx (int): Index for the current layer.
+        """
         super().__init__()
         self.hidden_size = config.hidden_size
         self.self_attn = Attention(config=config, layer_idx=layer_idx)
@@ -50,6 +86,28 @@ class DecoderLayer(nn.Module):
     ) -> Tuple[
         torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]
     ]:
+        """
+        Perform a forward pass through the decoder layer.
+
+        The input passes through an initial layer normalization, self-attention block, and
+        a feed-forward MLP with residual connections. Optionally, attention weights can be returned.
+
+        Args:
+            hidden_states (torch.Tensor): Input tensor with shape (batch_size, seq_length, hidden_size).
+            attention_mask (Optional[torch.Tensor], optional): Attention mask for self-attention.
+            position_ids (Optional[torch.LongTensor], optional): Tensor containing position indices.
+            past_key_value (Optional[Cache], optional): Cached past key and value tensors.
+            output_attentions (Optional[bool], optional): If True, returns self-attention weights.
+            use_cache (Optional[bool], optional): If True, enables caching for inference.
+            cache_position (Optional[torch.LongTensor], optional): Positions for caching tokens.
+            position_embeddings (Optional[Tuple[torch.Tensor, torch.Tensor]], optional): Pre-computed position embeddings.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+                - The output tensor of shape (batch_size, seq_length, hidden_size).
+                - Optionally, a tuple of self-attention weights.
+        """
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
@@ -81,10 +139,35 @@ class DecoderLayer(nn.Module):
 
 class Transformer(nn.Module):
     """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`DecoderLayer`]
+    Transformer decoder composed of multiple decoder layers.
+
+    This module includes:
+        - Token embedding.
+        - A stack of decoder layers.
+        - Rotary positional embeddings.
+        - Final normalization.
+        - Optional support for gradient checkpointing and caching.
+
+    Attributes:
+        padding_idx (int): Padding index for token embeddings.
+        vocab_size (int): Size of the vocabulary.
+        embed_tokens (Embedding): Token embedding layer.
+        layers (nn.ModuleList): A list of decoder layers.
+        norm (RMSNorm): Normalization applied after the last decoder layer.
+        rotary_emb (RotaryEmbedding): Module for rotary position embeddings.
+        gradient_checkpointing (bool): Enables gradient checkpointing if True.
+        config (Config): Model configuration.
     """
 
     def __init__(self, config: Config):
+        """
+        Initialize the Transformer decoder.
+
+        Loads weights for token embeddings, each decoder layer, and the final normalization.
+
+        Args:
+            config (Config): Configuration object with model hyperparameters.
+        """
         super().__init__()
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -110,9 +193,21 @@ class Transformer(nn.Module):
         self.config = config
 
     def get_input_embeddings(self):
+        """
+        Retrieve the input embeddings.
+
+        Returns:
+            Embedding: The embedding layer used for token lookup.
+        """
         return self.embed_tokens
 
     def set_input_embeddings(self, value):
+        """
+        Set the input embeddings.
+
+        Args:
+            value (Embedding): A new embedding layer.
+        """
         self.embed_tokens = value
 
     def forward(
@@ -128,6 +223,31 @@ class Transformer(nn.Module):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
+        """
+        Perform a forward pass through the Transformer decoder.
+
+        Delegates embedding lookup to the embedding layer, applies rotary position embeddings,
+        and passes data sequentially through each decoder layer. Also manages caching and generates
+        an updated causal mask based on past key values.
+
+        Args:
+            input_ids (torch.LongTensor, optional): Input token IDs.
+            attention_mask (Optional[torch.Tensor], optional): Attention mask for the sequence.
+            position_ids (Optional[torch.LongTensor], optional): Position IDs for the sequence.
+            past_key_values (Optional[Cache], optional): Cached key/value pairs.
+            inputs_embeds (Optional[torch.FloatTensor], optional): Pre-computed input embeddings.
+            use_cache (Optional[bool], optional): If True, enables caching.
+            output_attentions (Optional[bool], optional): If True, outputs attention weights.
+            output_hidden_states (Optional[bool], optional): If True, outputs hidden states.
+            return_dict (Optional[bool], optional): If True, returns a dict-like object instead of a tuple.
+            cache_position (Optional[torch.LongTensor], optional): Cache position indices.
+
+        Returns:
+            Union[Tuple, BaseModelOutputWithPast]:
+                - If return_dict is False, returns a tuple with logits and optionally additional outputs.
+                - Otherwise, returns a `BaseModelOutputWithPast` with last hidden state, cached key values,
+                  hidden states, and attentions.
+        """
         output_attentions = (
             output_attentions
             if output_attentions is not None
@@ -224,7 +344,22 @@ class Transformer(nn.Module):
         cache_position: torch.Tensor,
         past_key_values: dict,
     ):
+        """
+        Generate a causal attention mask accounting for cached tokens.
 
+        The mask is created based on the current input tensor, the cache positions, and the type of caching
+        used (static or sliding window). This allows the model to correctly attend to previous tokens and
+        manage attention when using caches.
+
+        Args:
+            attention_mask (torch.Tensor): Original attention mask.
+            input_tensor (torch.Tensor): Input tensor with shape (batch_size, seq_length, hidden_size).
+            cache_position (torch.Tensor): Tensor indicating positions for cached tokens.
+            past_key_values (dict): Cached past key values, possibly an instance of StaticCache or SlidingWindowCache.
+
+        Returns:
+            torch.Tensor: A 4D causal attention mask.
+        """
         past_seen_tokens = (
             past_key_values.get_seq_length() if past_key_values is not None else 0
         )
@@ -270,14 +405,29 @@ class Transformer(nn.Module):
         past_key_values: dict,
     ):
         """
-        Creates a causal 4D mask of shape `(batch_size, 1, query_length, key_value_length)` from a 2D mask of shape
-        `(batch_size, key_value_length)`, or if the input `attention_mask` is already 4D, do nothing.
+        Create a 4D causal attention mask with cache positions.
+
+        This function prepares a mask of shape (batch_size, 1, query_length, key_value_length) from a
+        2D mask or creates a new one if needed. For sliding window configurations, additional masking is applied.
+
+        Args:
+            attention_mask (torch.Tensor): Input attention mask.
+            sequence_length (int): Length of the current sequence.
+            target_length (int): The target length (e.g., including cached tokens).
+            dtype (torch.dtype): Data type for the mask.
+            device (torch.device): Device for the mask tensor.
+            cache_position (torch.Tensor): Tensor indicating positions for caching.
+            batch_size (int): Batch size.
+            config (Config): Model configuration (may include sliding window settings).
+            past_key_values (dict): Cached past key values.
+
+        Returns:
+            torch.Tensor: A 4D causal attention mask tensor of shape (batch_size, 1, query_length, key_value_length).
         """
         if attention_mask is not None and attention_mask.dim() == 4:
             causal_mask = attention_mask
 
         else:
-
             min_dtype = torch.finfo(dtype).min
             causal_mask = torch.full(
                 (sequence_length, target_length),
@@ -318,8 +468,33 @@ class Transformer(nn.Module):
 
 
 class SuperLazyLanguageModel(nn.Module):
+    """
+    A super lazy language model that encapsulates a Transformer decoder with optional LoRA parameters.
+
+    This model wraps the Transformer decoder, defines the head for vocabulary logits,
+    and computes the loss when labels are provided. It supports caching for efficient generation.
+
+    Attributes:
+        config (Config): Model configuration containing hyperparameters.
+        model (Transformer): Underlying Transformer-based decoder.
+        loss_function (nn.CrossEntropyLoss): Loss function for training.
+        vocab_size (int): Size of the model vocabulary.
+        lm_head (Linear): Linear projection layer from hidden states to vocabulary logits.
+    """
 
     def __init__(self, name, lora_alpha=16, lora_r=4, lora_dropout=0.1):
+        """
+        Initialize the SuperLazyLanguageModel.
+
+        Loads configuration and initializes the transformer decoder along with the language modeling head.
+        Optionally, applies LoRA modifications if enabled in the configuration.
+
+        Args:
+            name (str): Identifier or name of the model.
+            lora_alpha (int, optional): LoRA alpha hyperparameter. Defaults to 16.
+            lora_r (int, optional): LoRA rank. Defaults to 4.
+            lora_dropout (float, optional): LoRA dropout rate. Defaults to 0.1.
+        """
         super().__init__()
 
         self.config = Config(
@@ -348,21 +523,57 @@ class SuperLazyLanguageModel(nn.Module):
         )
 
     def get_input_embeddings(self):
+        """
+        Retrieve the input embeddings from the model.
+
+        Returns:
+            Embedding: Input embedding layer.
+        """
         return self.model.embed_tokens
 
     def set_input_embeddings(self, value):
+        """
+        Set the input embeddings for the model.
+
+        Args:
+            value (Embedding): New input embedding layer.
+        """
         self.model.embed_tokens = value
 
     def get_output_embeddings(self):
+        """
+        Retrieve the output embeddings (language modeling head).
+
+        Returns:
+            Linear: The linear layer projecting to vocabulary logits.
+        """
         return self.lm_head
 
     def set_output_embeddings(self, new_embeddings):
+        """
+        Set the output embeddings (language modeling head) for the model.
+
+        Args:
+            new_embeddings (Linear): New output embedding layer.
+        """
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
+        """
+        Replace the current Transformer decoder with a new one.
+
+        Args:
+            decoder (Transformer): A new transformer decoder module.
+        """
         self.model = decoder
 
     def get_decoder(self):
+        """
+        Retrieve the current Transformer decoder.
+
+        Returns:
+            Transformer: The underlying transformer decoder.
+        """
         return self.model
 
     def forward(
@@ -381,7 +592,34 @@ class SuperLazyLanguageModel(nn.Module):
         logits_to_keep: Union[int, torch.Tensor] = 0,
         **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        """Returns the logits and past_key_values (if use_cache is True)"""
+        """
+        Perform a forward pass through the SuperLazyLanguageModel.
+
+        The method computes embeddings (or uses precomputed ones), obtains outputs from the Transformer decoder,
+        projects hidden states to vocabulary logits using the lm_head, and computes the cross-entropy loss if labels are provided.
+        It supports caching for efficient autoregressive generation and can return outputs as a tuple or as a dict-like object.
+
+        Args:
+            input_ids (torch.LongTensor, optional): Token IDs as input.
+            attention_mask (Optional[torch.Tensor], optional): Mask to avoid attending to padding tokens.
+            position_ids (Optional[torch.LongTensor], optional): Position IDs corresponding to the tokens.
+            past_key_values (Optional[Union[Cache, List[torch.FloatTensor]]], optional): Cached key/value tensors.
+            inputs_embeds (Optional[torch.FloatTensor], optional): Pre-computed input embeddings.
+            labels (Optional[torch.LongTensor], optional): Ground truth labels for computing the loss.
+            use_cache (Optional[bool], optional): Whether to use past key values for caching.
+            output_attentions (Optional[bool], optional): Whether to return attention weights.
+            output_hidden_states (Optional[bool], optional): Whether to return hidden states.
+            return_dict (Optional[bool], optional): Whether to return a dict-like output.
+            cache_position (Optional[torch.LongTensor], optional): Cache positions for tokens.
+            logits_to_keep (Union[int, torch.Tensor], optional): Slicing index or tensor for logits computation.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Union[Tuple, CausalLMOutputWithPast]:
+                - If return_dict is False, returns a tuple containing logits and optionally other outputs.
+                - Otherwise, returns a `CausalLMOutputWithPast` with loss (if computed), logits, past key values,
+                  hidden states, and attention weights.
+        """
         output_attentions = (
             output_attentions
             if output_attentions is not None
